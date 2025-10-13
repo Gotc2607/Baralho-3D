@@ -1,96 +1,48 @@
 // src/components/Card.jsx
 
-import React, { useRef, useMemo, useEffect } from 'react';
-import { useLoader, useFrame } from '@react-three/fiber';
-import { useTexture, Plane } from '@react-three/drei';
+import React, { useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { useTexture, Plane, useFBO } from '@react-three/drei';
 import * as THREE from 'three';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { BackCardMaterial } from '../materials'; // Importa apenas o material do verso
+import Skull from './Skull';                   // Importa o nosso novo componente da caveira
 
-// Componente para a Caveira, para manter o código organizado
-function Skull({ theme }) {
-  const model = useLoader(OBJLoader, '/models/skull5.obj');
-
-  // useMemo otimiza a performance, recriando o material apenas quando o tema mudar
-  const skullMaterial = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
-      color: theme.colors.border,
-      emissive: theme.colors.eye,
-      emissiveIntensity: 0.6,
-      metalness: 0.9,
-      roughness: 0.3,
-    });
-  }, [theme]);
-
-  // Aplica o material a todos os meshes dentro do modelo .obj
-  useEffect(() => {
-    model.traverse(child => {
-      if (child.isMesh) {
-        child.material = skullMaterial;
-      }
-    });
-  }, [model, skullMaterial]);
-
-  return <primitive object={model} scale={8} rotation-y={Math.PI} />;
-}
-
-
-// Componente Principal do Card
-function Card({ cardData, theme, faceUp = false, ...props }) {
-  const groupRef = useRef();
-
-  // Carrega as texturas do cartão
-  const [frontTemplate, backTemplate] = useTexture([
-    '/textures/cardtemplate3.png',
-    '/textures/cardtemplateback4.png'
+function Card({ theme }) {
+  const [frontTexture, backTexture] = useTexture([
+    '/textures/card_front_ace.png',
+    '/textures/card_back_template.png',
   ]);
 
-  // Gera a textura dinâmica com o valor e o naipe da carta
-  const frontTexture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 768;
-    const ctx = canvas.getContext('2d');
+  // A lógica de RTT continua aqui, pois é o Cartão que orquestra a renderização.
+  const skullScene = useMemo(() => <Skull theme={theme} />, [theme]);
+  const camera = useMemo(() => {
+    const cam = new THREE.PerspectiveCamera(30, 1, 1, 10000);
+    cam.position.z = 30; // Posição da câmara da caveira, como no projeto de referência
+    return cam;
+  }, []);
 
-    if (frontTemplate.image) {
-      ctx.drawImage(frontTemplate.image, 0, 0, 512, 768);
+  const renderTarget = useFBO();
 
-      const color = cardData.suit === '♥' || cardData.suit === '♦' ? '#D40000' : '#222222';
-
-      ctx.font = 'bold 100px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = color;
-      ctx.fillText(cardData.value + cardData.suit, 256, 384);
-    }
-    return new THREE.CanvasTexture(canvas);
-  }, [cardData, frontTemplate]);
-
-  // Animação de rotação suave para o verso
-  useFrame(() => {
-    if (groupRef.current) {
-      // Rotaciona para a posição correta (faceUp ou faceDown)
-      groupRef.current.rotation.y = THREE.MathUtils.lerp(
-        groupRef.current.rotation.y,
-        faceUp ? 0 : Math.PI,
-        0.05 // Velocidade da animação
-      );
-    }
+  useFrame((state) => {
+    state.gl.setRenderTarget(renderTarget);
+    state.gl.render(skullScene, camera);
+    state.gl.setRenderTarget(null);
   });
 
   return (
-    <group ref={groupRef} {...props}>
+    <group>
       {/* Frente da Carta */}
-      <Plane args={[2, 3]} rotation-y={0}>
-        <meshStandardMaterial map={frontTexture} side={THREE.FrontSide} />
+      <Plane args={[3.5, 5]}>
+        <meshStandardMaterial map={frontTexture} transparent={true} />
       </Plane>
 
       {/* Verso da Carta */}
-      <Plane args={[2, 3]} rotation-y={Math.PI}>
-        <meshStandardMaterial map={backTemplate} side={THREE.FrontSide} />
-        {/* A caveira é um "filho" do verso, então só aparece quando o verso está visível */}
-        <group position-z={0.15}>
-          <Skull theme={theme} />
-        </group>
+      <Plane args={[3.5, 5]} rotation-y={Math.PI}>
+        {/* O nosso material importado. Muito mais limpo! */}
+        <backCardMaterial
+          cardTemplate={backTexture}
+          skullRender={renderTarget.texture}
+        />
       </Plane>
     </group>
   );
