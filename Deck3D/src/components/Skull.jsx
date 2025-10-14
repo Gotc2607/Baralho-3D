@@ -23,7 +23,7 @@ function Skull({ theme }) {
       <mesh>
         <primitive object={model} scale={8} rotation-y={Math.PI} />
         {/* Usamos o nosso material importado */}
-        <skullMaterial
+        <SkullMaterial
           ref={materialRef}
           color0={theme.colors.border}
           color1={theme.colors.base}

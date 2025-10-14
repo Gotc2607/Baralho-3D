@@ -39,7 +39,7 @@ function Card({ theme }) {
       {/* Verso da Carta */}
       <Plane args={[3.5, 5]} rotation-y={Math.PI}>
         {/* O nosso material importado. Muito mais limpo! */}
-        <backCardMaterial
+        <BackCardMaterial
           cardTemplate={backTexture}
           skullRender={renderTarget.texture}
         />
